@@ -5,15 +5,12 @@ $credentials = array(
     'password' => '',
     'database' => 'irostik_crmbot',
 );
+$encoding = 'utf8mb4';
 
 $json = array(); 
 
-$table = $_REQUEST['table'];
-$pname = $_REQUEST['pname'];
-$pvalue = $_REQUEST['pvalue'];
-
 $dsn     = 'mysql:host=' . $credentials['host'] . ';dbname=' . $credentials['database'];
-$options = array();
+$options = array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES ' . $encoding);
 try {
 	$pdo = new PDO($dsn, $credentials['user'], $credentials['password'], $options);
 	$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
@@ -21,9 +18,22 @@ try {
 	$json['error'] = 'MySQL not connected: '.$e->getMessage();
 }
 
+$table = $_REQUEST['table'];
 $sql = "SELECT * FROM {$table}";
-if (!empty($pname) && !empty($pvalue)) {
-    $sql .= " WHERE {$pname} = '{$pvalue}'";
+$filters = $_REQUEST['filters'];
+
+if (!empty($filters)) {
+    $srchstr = array();
+    $searchData = json_decode($filters);
+    foreach ($searchData->rules as $rule) {
+	  $str = $rule->data;
+	  $field = $rule->field;
+      switch ($rule->op) {
+        case 'eq': $srchstr[] = "({$field} = '{$str}')"; break;
+        case 'bw': $srchstr[] = "({$field} LIKE '{$str}%')"; break;
+      }
+    }
+    $sql .= " WHERE ".implode(' AND ', $srchstr);
 }
 $json['sql'] = $sql;
 
